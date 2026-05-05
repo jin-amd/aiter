@@ -233,6 +233,7 @@ def gemm_a8w8_blockscale_cktile(
     Out: torch.Tensor,
     isBpreshuffled: bool = False,
     splitK: int = 0,
+    y_is_zeroed: bool = False,
 ) -> torch.Tensor: ...
 
 
@@ -262,6 +263,8 @@ def gemm_a8w8_blockscale_bpreshuffle_cktile(
     w_scale: torch.Tensor,
     Out: torch.Tensor,
     isBpreshuffled: bool = True,
+    splitK: int = 0,
+    y_is_zeroed: bool = False,
 ) -> torch.Tensor: ...
 
 
@@ -730,7 +733,11 @@ def gemm_a8w8_blockscale_bpreshuffle_fake(
     x_scale: Tensor,
     w_scale: Tensor,
     dtype: torch.dtype = dtypes.bf16,
+    out: Optional[Tensor] = None,
+    y_is_zeroed: bool = False,
 ) -> Tensor:
+    if out is not None:
+        return out
     return torch.empty(XQ.shape[0], WQ.shape[0], dtype=dtype, device=XQ.device)
 
 
@@ -741,7 +748,24 @@ def gemm_a8w8_blockscale_bpreshuffle(
     x_scale: Tensor,
     w_scale: Tensor,
     dtype: torch.dtype = dtypes.bf16,
+    out: Optional[Tensor] = None,
+    y_is_zeroed: bool = False,
 ) -> Tensor:
+    """FP8 a8w8 blockscale GEMM with bpreshuffled weight layout.
+
+    Args:
+        XQ: FP8 activations, shape (M, K).
+        WQ: FP8 weights (preshuffled), shape (N, K) logically.
+        x_scale: per_1x128 activation scales.
+        w_scale: per_128x128 weight scales.
+        dtype: output dtype.
+        out: optional pre-allocated output tensor (shape (M, N), dtype `dtype`).
+            When provided, the GEMM writes into this tensor instead of allocating a new one.
+        y_is_zeroed: when True, the caller has already zeroed `out`, so the
+            kernel will skip its internal Y.zero_() before the SplitK atomic_add.
+            This is used by the producer-fused zero-init path.  Has no effect
+            when splitK == 0.  Only honored by the cktile branch today.
+    """
     assert dtype in [
         dtypes.bf16,
         dtypes.fp16,
@@ -752,16 +776,29 @@ def gemm_a8w8_blockscale_bpreshuffle(
     config = get_CKGEMM_config(
         m, n, k, AITER_CONFIGS.AITER_CONFIG_GEMM_A8W8_BLOCKSCALE_BPRESHUFFLE_FILE
     )
-    Y = torch.empty(m, n, dtype=dtype, device=XQ.device)
+    if out is None:
+        Y = torch.empty(m, n, dtype=dtype, device=XQ.device)
+    else:
+        assert out.shape == (m, n), f"out shape {tuple(out.shape)} != ({m}, {n})"
+        assert out.dtype == dtype, f"out dtype {out.dtype} != {dtype}"
+        Y = out
     if config is not None:
         libtype = config["libtype"]
+        splitK = int(config.get("splitK", 0))
         if libtype == "cktile":
-            return gemm_a8w8_blockscale_bpreshuffle_cktile(XQ, WQ, x_scale, w_scale, Y)
+            return gemm_a8w8_blockscale_bpreshuffle_cktile(
+                XQ,
+                WQ,
+                x_scale,
+                w_scale,
+                Y,
+                splitK=splitK,
+                y_is_zeroed=y_is_zeroed,
+            )
         elif libtype == "ck":
             return gemm_a8w8_blockscale_bpreshuffle_ck(XQ, WQ, x_scale, w_scale, Y)
         elif libtype == "asm":
             kernelName = config["kernelName"]
-            splitK = config["splitK"]
             return gemm_a8w8_blockscale_bpreshuffle_asm(
                 XQ, WQ, Y, x_scale, w_scale, splitK=splitK, kernelName=kernelName
             )

@@ -14,7 +14,7 @@
 #include "gemm_a8w8_blockscale_cktile_manifest.h"
 
 using BlockwiseKernel = std::function<torch::Tensor(
-    torch::Tensor&, torch::Tensor&, torch::Tensor&, torch::Tensor&, torch::Tensor&, bool, int)>;
+    torch::Tensor&, torch::Tensor&, torch::Tensor&, torch::Tensor&, torch::Tensor&, bool, int, bool)>;
 
 using BlockwiseKernelMap = GemmDispatchMap<BlockwiseKernel>;
 
@@ -83,7 +83,8 @@ torch::Tensor gemm_a8w8_blockscale_cktile(torch::Tensor& XQ,
                                           torch::Tensor& w_scale,
                                           torch::Tensor& Y,
                                           bool preshuffleB,
-                                          int splitK)
+                                          int splitK,
+                                          bool y_is_zeroed)
 {
     TORCH_CHECK(XQ.dtype() == WQ.dtype(), "Weights and activations should have the same dtype!");
     TORCH_CHECK(x_scale.dtype() == w_scale.dtype(), "Scales should have the same dtype!");
@@ -100,12 +101,12 @@ torch::Tensor gemm_a8w8_blockscale_cktile(torch::Tensor& XQ,
     if(x_scale.dtype() == at::ScalarType::Float && Y.dtype() == at::ScalarType::Half)
     {
         blockscale_dispatch<TILE_FP32, TILE_FP16>(M, N, K)(
-            XQ, WQ, x_scale, w_scale, Y, preshuffleB, KBatch);
+            XQ, WQ, x_scale, w_scale, Y, preshuffleB, KBatch, y_is_zeroed);
     }
     else if(x_scale.dtype() == at::ScalarType::Float && Y.dtype() == at::ScalarType::BFloat16)
     {
         blockscale_dispatch<TILE_FP32, TILE_BF16>(M, N, K)(
-            XQ, WQ, x_scale, w_scale, Y, preshuffleB, KBatch);
+            XQ, WQ, x_scale, w_scale, Y, preshuffleB, KBatch, y_is_zeroed);
     }
     else
     {
@@ -119,7 +120,10 @@ torch::Tensor gemm_a8w8_blockscale_bpreshuffle_cktile(torch::Tensor& XQ,
                                                       torch::Tensor& x_scale,
                                                       torch::Tensor& w_scale,
                                                       torch::Tensor& Y,
-                                                      bool preshuffleB)
+                                                      bool preshuffleB,
+                                                      int splitK,
+                                                      bool y_is_zeroed)
 {
-    return gemm_a8w8_blockscale_cktile(XQ, WQ, x_scale, w_scale, Y, preshuffleB, 0);
+    return gemm_a8w8_blockscale_cktile(
+        XQ, WQ, x_scale, w_scale, Y, preshuffleB, splitK, y_is_zeroed);
 }
