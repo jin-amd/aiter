@@ -80,3 +80,6 @@ scripts/results/*.csv
 # Jupyter notebook checkpoints and outputs
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
+# zero-init splitK demo results (timestamped run dirs only; keep README)
+op_tests/zero_init_demo_results/[0-9]*/
+op_tests/zero_init_demo_results/trace_*/
