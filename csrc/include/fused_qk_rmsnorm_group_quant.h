@@ -22,6 +22,7 @@ void fused_qk_rmsnorm_group_quant(std::optional<torch::Tensor> q_out_quantized,
                                   std::optional<torch::Tensor> q_residual,
                                   int64_t group_size,
                                   bool transpose_scale,
-                                  bool gemma_norm);
+                                  bool gemma_norm,
+                                  std::optional<torch::Tensor> gemm_out_zero_init = std::nullopt);
 
 } // namespace aiter
