@@ -249,6 +249,7 @@ def gemm_afp4wfp4_(
             ADD_BIAS=False,
             activation="",
             use_activation=False,
+            KERNEL_NAME="_gemm_afp4wfp4_reduce_kernel",
         )
 
     return y
@@ -408,6 +409,7 @@ def gemm_afp4wfp4_preshuffled_scales(
             ADD_BIAS=False,
             activation="",
             use_activation=False,
+            KERNEL_NAME="_gemm_afp4wfp4_reduce_kernel",
         )
 
     return y
@@ -590,6 +592,7 @@ def gemm_afp4wfp4_preshuffle(
             ADD_BIAS=False,
             activation="",
             use_activation=False,
+            KERNEL_NAME="_gemm_afp4wfp4_reduce_kernel",
         )
 
     return y
