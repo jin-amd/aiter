@@ -378,9 +378,9 @@ def fused_moe_(
     if block_size_M is not None:
         block_size_M = int(block_size_M)
 
-    assert not metadata.flat or get_gfx() == "gfx950", (
-        f"FLAT fmoe asm kernels are gfx950-only; refusing to launch on {get_gfx()}. "
-    )
+    assert (
+        not metadata.flat or get_gfx() == "gfx950"
+    ), f"FLAT fmoe asm kernels are gfx950-only; refusing to launch on {get_gfx()}. "
 
     sorted_ids, sorted_weights, sorted_expert_ids, num_valid_ids, moe_buf = moe_sorting(
         topk_ids,
