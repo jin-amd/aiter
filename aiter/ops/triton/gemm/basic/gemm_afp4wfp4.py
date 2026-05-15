@@ -11,8 +11,10 @@ from aiter.ops.triton._triton_kernels.gemm.basic.gemm_afp4wfp4 import (
     _gemm_afp4wfp4_kernel,
     _gemm_afp4wfp4_preshuffle_kernel,
     _gemm_afp4wfp4_kernel_preshuffle_scales,
-    _gemm_afp4wfp4_reduce_kernel,
     _get_config,
+)
+from aiter.ops.triton._triton_kernels.common.splitk_reduce import (
+    _gemm_splitk_reduce_kernel,
 )
 from aiter.ops.triton.utils.core import AITER_TRITON_CONFIGS_PATH
 from aiter.jit.utils.torch_guard import torch_compile_guard
@@ -229,9 +231,10 @@ def gemm_afp4wfp4_(
             triton.cdiv(M, REDUCE_BLOCK_SIZE_M),
             triton.cdiv(N, REDUCE_BLOCK_SIZE_N),
         )
-        _gemm_afp4wfp4_reduce_kernel[grid_reduce](
+        _gemm_splitk_reduce_kernel[grid_reduce](
             y_pp,
             y,
+            None,
             M,
             N,
             y_pp.stride(0),
@@ -243,6 +246,9 @@ def gemm_afp4wfp4_(
             REDUCE_BLOCK_SIZE_N,
             ACTUAL_KSPLIT,
             triton.next_power_of_2(config["NUM_KSPLIT"]),
+            ADD_BIAS=False,
+            activation="",
+            use_activation=False,
         )
 
     return y
@@ -384,9 +390,10 @@ def gemm_afp4wfp4_preshuffled_scales(
             triton.cdiv(M, REDUCE_BLOCK_SIZE_M),
             triton.cdiv(N, REDUCE_BLOCK_SIZE_N),
         )
-        _gemm_afp4wfp4_reduce_kernel[grid_reduce](
+        _gemm_splitk_reduce_kernel[grid_reduce](
             y_pp,
             y,
+            None,
             M,
             N,
             y_pp.stride(0),
@@ -398,6 +405,9 @@ def gemm_afp4wfp4_preshuffled_scales(
             REDUCE_BLOCK_SIZE_N,
             ACTUAL_KSPLIT,
             triton.next_power_of_2(config["NUM_KSPLIT"]),
+            ADD_BIAS=False,
+            activation="",
+            use_activation=False,
         )
 
     return y
@@ -562,9 +572,10 @@ def gemm_afp4wfp4_preshuffle(
             triton.cdiv(M, REDUCE_BLOCK_SIZE_M),
             triton.cdiv(N, REDUCE_BLOCK_SIZE_N),
         )
-        _gemm_afp4wfp4_reduce_kernel[grid_reduce](
+        _gemm_splitk_reduce_kernel[grid_reduce](
             y_pp,
             y,
+            None,
             M,
             N,
             y_pp.stride(0),
@@ -576,6 +587,9 @@ def gemm_afp4wfp4_preshuffle(
             REDUCE_BLOCK_SIZE_N,
             ACTUAL_KSPLIT,
             triton.next_power_of_2(config["NUM_KSPLIT"]),
+            ADD_BIAS=False,
+            activation="",
+            use_activation=False,
         )
 
     return y
