@@ -191,7 +191,11 @@ def make_preshuffle_b_layout(
     c_k_bytes = c_k * arith.constant(int(elem_bytes), index=True)
     n0 = c_n // c16
 
-    c_kpack_elems = c_kpack if elem_bytes == 1 else (c_kpack // arith.constant(int(elem_bytes), index=True))
+    c_kpack_elems = (
+        c_kpack
+        if elem_bytes == 1
+        else (c_kpack // arith.constant(int(elem_bytes), index=True))
+    )
 
     stride_nlane = c_kpack_elems
 
@@ -734,8 +738,13 @@ def xcd_remap_bx_by(
     _num_wgs = _gx * _gy
 
     _c_xcds = fx.arith.constant(num_xcds, index=True)
-    _wgs_per_xcd = _num_wgs / _c_xcds
-    _wgid = (_linear_id % _c_xcds) * _wgs_per_xcd + (_linear_id / _c_xcds)
+    _q = _num_wgs / _c_xcds
+    _r = _num_wgs % _c_xcds
+    _xcd = _linear_id % _c_xcds
+    _in_xcd = _linear_id / _c_xcds
+    _xcd_lt_r = fx.arith.cmpi(CmpIPredicate.ult, _xcd, _r)
+    _clip = fx.arith.select(_xcd_lt_r, _xcd, _r)
+    _wgid = _xcd * _q + _clip + _in_xcd
 
     _c_wgm = fx.arith.constant(xcd_swizzle, index=True)
     _num_wgid_in_group = _c_wgm * _gx
@@ -819,9 +828,7 @@ def _load_groupwise_scale(
         # (E, G//2, N, 2) layout: dword at [e, pair, n] holds bf16 scales
         # for groups 2*pair and 2*pair+1.
         pair_idx = group_idx >> fx.Index(1)  # group_idx // 2
-        # Flat dword index: expert_offset * (num_pairs-1) + n_global
-        # The (num_pairs-1) cancels the expert part of n_global:
-        #   e*N*(G//2-1) + (e*N + n_local) = e*N*G//2 + n_local
+        # Dword index: same flat formula but with G//2 groups
         num_pairs = num_groups // 2
         c_npm1 = fx.Index(num_pairs - 1)
         dword_base = expert_offset * c_npm1 + n_global
@@ -833,9 +840,6 @@ def _load_groupwise_scale(
         )
     else:
         # (E, G, N) layout with f32 dtype
-        # Flat index: expert_offset * (G-1) + n_global
-        # The (G-1) cancels the expert part of n_global:
-        #   e*N*(G-1) + (e*N + n_local) = e*N*G + n_local
         c_gm1 = fx.Index(num_groups - 1)
         base_scale = expert_offset * c_gm1 + n_global
         elem_idx = base_scale + group_idx * c_npe
