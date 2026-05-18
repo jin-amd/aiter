@@ -424,7 +424,7 @@ def parse_args() -> argparse.Namespace:
         type=str.lower,
         choices=SUPPORTED_GROUP_SIZES_DTYPES_STR,
         default=GROUP_SIZES_DTYPE_STR,
-        help=f"group_sizes data type (default: {GROUP_SIZES_DTYPE_STR})",
+        help=f"group sizes data type (default: {GROUP_SIZES_DTYPE_STR})",
     )
 
     # Benchmark metric
